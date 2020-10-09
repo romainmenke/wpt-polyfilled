@@ -18,9 +18,9 @@ import (
 )
 
 func main() {
-	publicAddr := "" + os.Getenv("PUBLIC_ADDR")
-	publicAddrWWW := "www." + os.Getenv("PUBLIC_ADDR")
-	publicAddrWWW1 := "www1." + os.Getenv("PUBLIC_ADDR")
+	publicAddr := "wpt." + os.Getenv("PUBLIC_ADDR")
+	publicAddrWWW := "wpt." + os.Getenv("PUBLIC_ADDR")
+	publicAddrWWW1 := "wpt1." + os.Getenv("PUBLIC_ADDR")
 	if os.Getenv("DEV") != "" {
 		publicAddr = "bs-local.com:6543"
 		publicAddrWWW = "bs-local.com:6543"
