@@ -54,9 +54,10 @@ func main() {
 	}
 
 	go func() {
+		log.Println("http: Server listening")
 		err := srv.ListenAndServe()
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 		}
 	}()
 
@@ -81,6 +82,14 @@ type rewritingTransport struct {
 }
 
 func (t *rewritingTransport) RoundTrip(req *http.Request) (resp *http.Response, err error) {
+	if strings.HasPrefix(req.URL.Path, "/.") && !strings.HasPrefix(req.URL.Path, "/.well-known") {
+		resp = &http.Response{}
+		resp.StatusCode = http.StatusNotFound
+		resp.Status = http.StatusText(http.StatusNotFound)
+		resp.Body = ioutil.NopCloser(bytes.NewReader([]byte(fmt.Sprintf("%d %s", http.StatusNotFound, http.StatusText(http.StatusNotFound)))))
+		return resp, nil
+	}
+
 	query := req.URL.Query()
 	for k, vv := range query {
 		for i, v := range vv {
@@ -117,6 +126,8 @@ func (t *rewritingTransport) RoundTrip(req *http.Request) (resp *http.Response, 
 		} else {
 			b = bytes.Replace(b, []byte("<script"), []byte("<script src=\"https://polyfill.io/v3/polyfill.min.js?features=all\"></script><script"), 1)
 		}
+
+		b = append(b, []byte("<!--All contents pulled from https://wpt.live-->")...)
 	}
 
 	body := ioutil.NopCloser(bytes.NewReader(b))
