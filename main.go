@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -12,10 +13,13 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/evanw/esbuild/pkg/api"
 )
 
 func main() {
@@ -137,7 +141,7 @@ func (t *rewritingTransport) RoundTrip(req *http.Request) (resp *http.Response, 
 	}
 
 	if resp.Header.Get("Content-Type") == "text/javascript; charset=utf-8" {
-		b = t.transpileJS(ctx, b)
+		b = t.transpileJS(ctx, b, filepath.Base(req.URL.Path))
 	}
 
 	body := ioutil.NopCloser(bytes.NewReader(b))
@@ -148,26 +152,55 @@ func (t *rewritingTransport) RoundTrip(req *http.Request) (resp *http.Response, 
 	return resp, nil
 }
 
-func (t *rewritingTransport) transpileJS(ctx context.Context, b []byte) []byte {
-	inputBuffer := bytes.NewBuffer(b)
+func (t *rewritingTransport) transpileJS(ctx context.Context, b []byte, fileName string) []byte {
+	inBuf := bytes.NewBuffer(b)
+	outBuf := bytes.NewBuffer(nil)
+	errBuf := bytes.NewBuffer(nil)
 
 	cmd := exec.Command(
 		"yarn",
 		"-s",
 		"babel",
-		"-f",
+		"--config-file",
 		"./babel.rc.json",
+		"-f",
+		fileName,
 	)
 
-	cmd.Stdin = inputBuffer
-
-	stdoutStderr, err := cmd.CombinedOutput()
+	cmd.Stdin = inBuf
+	cmd.Stdout = outBuf
+	cmd.Stderr = errBuf
+	err := cmd.Run()
 	if err != nil {
 		log.Println(err)
 		return b
 	}
 
-	return append(stdoutStderr, []byte("\n/* transpiled */\n")...)
+	errB, err := ioutil.ReadAll(errBuf)
+	if err != nil {
+		log.Println(err)
+		return b
+	}
+
+	if len(errB) > 0 {
+		log.Println(string(errB))
+		return b
+	}
+
+	outB, err := ioutil.ReadAll(outBuf)
+	if err != nil {
+		log.Println(err)
+		return b
+	}
+
+	output := append(outB, []byte("\n/* transpiled */\n")...)
+	err = validateSource(output)
+	if err != nil {
+		log.Println(err)
+		return b
+	}
+
+	return output
 }
 
 func (t *rewritingTransport) rewriteBytes(b []byte) []byte {
@@ -208,4 +241,34 @@ func (t *rewritingTransport) rewriteStringReverse(s string) string {
 	s = strings.Replace(s, t.publicAddrWWW1, "www1.wpt.live", -1)
 
 	return s
+}
+
+func validateSource(code []byte) error {
+	result := api.Transform(string(code), api.TransformOptions{
+		Loader: api.LoaderJS,
+		Target: api.ES5,
+	})
+
+	hasRealWarningsOrErrors := false
+	if len(result.Errors) > 0 || len(result.Warnings) > 0 {
+		for _, err := range result.Errors {
+			log.Println("err", err)
+			hasRealWarningsOrErrors = true
+		}
+
+		for _, warning := range result.Warnings {
+			if warning.Text == "Comparison with -0 using the \"===\" operator will also match 0" {
+				continue
+			}
+
+			log.Println("warning", warning)
+			hasRealWarningsOrErrors = true
+		}
+	}
+
+	if hasRealWarningsOrErrors {
+		return errors.New(fmt.Sprintf("Error parsing source code for %s"))
+	}
+
+	return nil
 }
