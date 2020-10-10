@@ -12,7 +12,8 @@ jobs:
 
     - name: Get dependencies
       run: |
-        go get -v -t -d ./...
+				go get -v -t -d ./...
+				yarn install
     - name: Build
       run: go build -v ./...
 
