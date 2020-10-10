@@ -130,11 +130,12 @@ func (t *rewritingTransport) RoundTrip(req *http.Request) (resp *http.Response, 
 
 	b = t.rewriteBytes(b)
 
+	// TODO : remove version param
 	if resp.Header.Get("Content-Type") == "text/html" {
 		if bytes.Contains(b, []byte("<head>")) {
-			b = bytes.Replace(b, []byte("<head>"), []byte("<head><script src=\"https://polyfill.io/v3/polyfill.min.js?features=default\"></script>"), 1)
+			b = bytes.Replace(b, []byte("<head>"), []byte("<head><script>delete window.localStorage</script><script src=\"https://polyfill.io/v3/polyfill.min.js?features=all&version=3.89.4\"></script>"), 1)
 		} else {
-			b = bytes.Replace(b, []byte("<script"), []byte("<script src=\"https://polyfill.io/v3/polyfill.min.js?features=default\"></script><script"), 1)
+			b = bytes.Replace(b, []byte("<script"), []byte("<script>delete window.localStorage</script><script src=\"https://polyfill.io/v3/polyfill.min.js?features=all&version=3.89.4\"></script><script"), 1)
 		}
 
 		b = append(b, []byte("<!--All contents pulled from https://wpt.live-->")...)
@@ -267,7 +268,7 @@ func validateSource(code []byte) error {
 	}
 
 	if hasRealWarningsOrErrors {
-		return errors.New(fmt.Sprintf("Error parsing source code for %s"))
+		return errors.New("Error parsing source code")
 	}
 
 	return nil
