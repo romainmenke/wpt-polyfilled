@@ -151,7 +151,8 @@ func (t *rewritingTransport) RoundTrip(req *http.Request) (resp *http.Response, 
 		b = append(b, []byte("<!--All contents pulled from https://wpt.live-->")...)
 	}
 
-	if resp.Header.Get("Content-Type") == "text/javascript; charset=utf-8" {
+	if resp.Header.Get("Content-Type") == "text/javascript; charset=utf-8" ||
+		resp.Header.Get("Content-Type") == "text/javascript" {
 		b = t.transpileJS(ctx, b, filepath.Base(req.URL.Path))
 	}
 
