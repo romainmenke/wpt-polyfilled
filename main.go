@@ -10,6 +10,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"os/exec"
 	"os/signal"
 	"strconv"
 	"strings"
@@ -82,6 +83,9 @@ type rewritingTransport struct {
 }
 
 func (t *rewritingTransport) RoundTrip(req *http.Request) (resp *http.Response, err error) {
+	ctx, cancel := context.WithTimeout(req.Context(), time.Second*60)
+	defer cancel()
+
 	if strings.HasPrefix(req.URL.Path, "/.") && !strings.HasPrefix(req.URL.Path, "/.well-known") {
 		resp = &http.Response{}
 		resp.StatusCode = http.StatusNotFound
@@ -133,7 +137,7 @@ func (t *rewritingTransport) RoundTrip(req *http.Request) (resp *http.Response, 
 	}
 
 	if resp.Header.Get("Content-Type") == "text/javascript; charset=utf-8" {
-		b = t.transpileJS(b)
+		b = t.transpileJS(ctx, b)
 	}
 
 	body := ioutil.NopCloser(bytes.NewReader(b))
@@ -144,9 +148,26 @@ func (t *rewritingTransport) RoundTrip(req *http.Request) (resp *http.Response, 
 	return resp, nil
 }
 
-func (t *rewritingTransport) transpileJS(b []byte) []byte {
-	// todo
-	return b
+func (t *rewritingTransport) transpileJS(ctx context.Context, b []byte) []byte {
+	inputBuffer := bytes.NewBuffer(b)
+
+	cmd := exec.Command(
+		"yarn",
+		"-s",
+		"babel",
+		"-f",
+		"./babel.rc.json",
+	)
+
+	cmd.Stdin = inputBuffer
+
+	stdoutStderr, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Println(err)
+		return b
+	}
+
+	return append(stdoutStderr, []byte("\n/* transpiled */\n")...)
 }
 
 func (t *rewritingTransport) rewriteBytes(b []byte) []byte {
