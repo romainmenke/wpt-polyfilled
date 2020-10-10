@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
@@ -142,6 +143,15 @@ func (t *rewritingTransport) RoundTrip(req *http.Request) (resp *http.Response, 
 
 	// TODO : remove version param
 	if resp.Header.Get("Content-Type") == "text/html" {
+		re := regexp.MustCompile(`(?s)<\s*script[^>]*>([^<]+?)</script>`)
+
+		submatchall := re.FindAllSubmatch(b, -1)
+		for _, element := range submatchall {
+			if len(element[1]) > 0 {
+				b = bytes.Replace(b, element[1], t.transpileJS(ctx, element[1], filepath.Base(req.URL.Path)), -1)
+			}
+		}
+
 		if bytes.Contains(b, []byte("<head>")) {
 			b = bytes.Replace(b, []byte("<head>"), []byte("<head><script src=\"https://polyfill.io/v3/polyfill.min.js?features=all&version=3.89.4\"></script>"), 1)
 		} else {
@@ -184,6 +194,12 @@ func (t *rewritingTransport) transpileJS(ctx context.Context, b []byte, fileName
 	cmd.Stderr = errBuf
 	err := cmd.Run()
 	if err != nil {
+		errB, errFromErrBuf := ioutil.ReadAll(errBuf)
+		if errFromErrBuf == nil {
+			log.Println(string(errB))
+			return b
+		}
+
 		log.Println(err)
 		return b
 	}
