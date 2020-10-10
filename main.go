@@ -116,18 +116,24 @@ func (t *rewritingTransport) RoundTrip(req *http.Request) (resp *http.Response, 
 		return nil, err
 	}
 
-	resp.Header.Set("Location", t.rewriteString(resp.Header.Get("Location")))
+	if resp.Header.Get("Location") != "" {
+		resp.Header.Set("Location", t.rewriteString(resp.Header.Get("Location")))
+	}
 
 	b = t.rewriteBytes(b)
 
 	if resp.Header.Get("Content-Type") == "text/html" {
 		if bytes.Contains(b, []byte("<head>")) {
-			b = bytes.Replace(b, []byte("<head>"), []byte("<head><script src=\"https://polyfill.io/v3/polyfill.min.js?features=all\"></script>"), 1)
+			b = bytes.Replace(b, []byte("<head>"), []byte("<head><script src=\"https://polyfill.io/v3/polyfill.min.js?features=default\"></script>"), 1)
 		} else {
-			b = bytes.Replace(b, []byte("<script"), []byte("<script src=\"https://polyfill.io/v3/polyfill.min.js?features=all\"></script><script"), 1)
+			b = bytes.Replace(b, []byte("<script"), []byte("<script src=\"https://polyfill.io/v3/polyfill.min.js?features=default\"></script><script"), 1)
 		}
 
 		b = append(b, []byte("<!--All contents pulled from https://wpt.live-->")...)
+	}
+
+	if resp.Header.Get("Content-Type") == "text/javascript; charset=utf-8" {
+		b = t.transpileJS(b)
 	}
 
 	body := ioutil.NopCloser(bytes.NewReader(b))
@@ -136,6 +142,11 @@ func (t *rewritingTransport) RoundTrip(req *http.Request) (resp *http.Response, 
 	resp.Header.Set("Content-Length", strconv.Itoa(len(b)))
 
 	return resp, nil
+}
+
+func (t *rewritingTransport) transpileJS(b []byte) []byte {
+	// todo
+	return b
 }
 
 func (t *rewritingTransport) rewriteBytes(b []byte) []byte {
