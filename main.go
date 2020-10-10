@@ -35,27 +35,15 @@ func main() {
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
-	wptURL, err := url.Parse("https://wpt.live/")
-	if err != nil {
-		panic(err)
-	}
-
-	proxy := httputil.NewSingleHostReverseProxy(wptURL)
-	proxy.ModifyResponse = func(w *http.Response) error {
-		return nil
-	}
-	proxy.Transport = &rewritingTransport{
-		roundTripper:   http.DefaultTransport,
-		publicAddr:     publicAddr,
-		publicAddrWWW:  publicAddrWWW,
-		publicAddrWWW1: publicAddrWWW1,
-	}
-
 	srv := &http.Server{
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		Addr:         ":" + os.Getenv("PORT"),
-		Handler:      proxy,
+		Handler: wptHandler(
+			publicAddr,
+			publicAddrWWW,
+			publicAddrWWW1,
+		),
 	}
 
 	go func() {
@@ -77,6 +65,28 @@ func main() {
 	if err := srv.Shutdown(ctx); err != nil {
 		log.Fatalf("Server Shutdown Failed:%+v", err)
 	}
+}
+
+func wptHandler(publicAddr string, publicAddrWWW string, publicAddrWWW1 string) http.Handler {
+	wptURL, err := url.Parse("https://wpt.live/")
+	if err != nil {
+		panic(err)
+	}
+
+	proxy := httputil.NewSingleHostReverseProxy(wptURL)
+
+	proxy.ModifyResponse = func(w *http.Response) error {
+		return nil
+	}
+
+	proxy.Transport = &rewritingTransport{
+		roundTripper:   http.DefaultTransport,
+		publicAddr:     publicAddr,
+		publicAddrWWW:  publicAddrWWW,
+		publicAddrWWW1: publicAddrWWW1,
+	}
+
+	return proxy
 }
 
 type rewritingTransport struct {
