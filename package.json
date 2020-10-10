@@ -1,0 +1,8 @@
+{
+  "name": "wpt-polyfilled",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "https://github.com/romainmenke/wpt-polyfilled.git",
+  "author": "romainmenke <romainmenke@gmail.com>",
+  "license": "MIT"
+}
