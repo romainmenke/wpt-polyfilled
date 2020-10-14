@@ -30,9 +30,9 @@ var packageJSONLock = sync.Mutex{}
 
 func main() {
 	publicAddr := "wpt." + os.Getenv("PUBLIC_ADDR")
-	publicAddrWWW := "wpt-a." + os.Getenv("PUBLIC_ADDR")
-	publicAddrWWW1 := "wpt-b." + os.Getenv("PUBLIC_ADDR")
-	publicAddrWWW2 := "wpt-c." + os.Getenv("PUBLIC_ADDR")
+	publicAddrWWW := "a.wpt." + os.Getenv("PUBLIC_ADDR")
+	publicAddrWWW1 := "b.wpt." + os.Getenv("PUBLIC_ADDR")
+	publicAddrWWW2 := "c.wpt." + os.Getenv("PUBLIC_ADDR")
 
 	if os.Getenv("DEV") != "" {
 		publicAddr = "bs-local.com:" + os.Getenv("PORT")
