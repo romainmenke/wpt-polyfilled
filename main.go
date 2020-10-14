@@ -150,6 +150,12 @@ func (t *rewritingTransport) RoundTrip(req *http.Request) (resp *http.Response, 
 		resp.Header.Set("Location", t.rewriteString(resp.Header.Get("Location")))
 	}
 
+	setCookieValues := resp.Header.Values("Set-Cookie")
+	resp.Header.Del("Set-Cookie")
+	for _, v := range setCookieValues {
+		resp.Header.Add("Set-Cookie", t.rewriteString(v))
+	}
+
 	b = t.rewriteBytes(b)
 
 	// TODO : remove version param
@@ -214,6 +220,9 @@ func (t *rewritingTransport) rewriteString(s string) string {
 
 	s = strings.Replace(s, "www2.wpt.live:80", t.publicAddrWWW2, -1)
 	s = strings.Replace(s, "www2.wpt.live", t.publicAddrWWW2, -1)
+
+	s = strings.Replace(s, ".wpt.live:80", "."+t.publicAddr, -1)
+	s = strings.Replace(s, ".wpt.live", "."+t.publicAddr, -1)
 
 	s = strings.Replace(s, "wpt.live:80", t.publicAddr, -1)
 	s = strings.Replace(s, "wpt.live", t.publicAddr, -1)
