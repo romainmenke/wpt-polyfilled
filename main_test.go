@@ -18,17 +18,23 @@ func TestMain(t *testing.T) {
 	srv2 := httptest.NewUnstartedServer(nil)
 	srv2Addr := srv2.URL
 
-	srv.Config = &http.Server{Handler: wptHandler(srvAddr, srv1Addr, srv2Addr)}
-	srv1.Config = &http.Server{Handler: wptHandler(srvAddr, srv1Addr, srv2Addr)}
-	srv2.Config = &http.Server{Handler: wptHandler(srvAddr, srv1Addr, srv2Addr)}
+	srv3 := httptest.NewUnstartedServer(nil)
+	srv3Addr := srv3.URL
+
+	srv.Config = &http.Server{Handler: wptHandler(srvAddr, srv1Addr, srv2Addr, srv3Addr)}
+	srv1.Config = &http.Server{Handler: wptHandler(srvAddr, srv1Addr, srv2Addr, srv3Addr)}
+	srv2.Config = &http.Server{Handler: wptHandler(srvAddr, srv1Addr, srv2Addr, srv3Addr)}
+	srv2.Config = &http.Server{Handler: wptHandler(srvAddr, srv1Addr, srv2Addr, srv3Addr)}
 
 	srv.Start()
 	srv1.Start()
 	srv2.Start()
+	srv3.Start()
 
 	defer srv.Close()
 	defer srv1.Close()
 	defer srv2.Close()
+	defer srv3.Close()
 
 	_, err := http.Get(srv.URL)
 	if err != nil {
@@ -46,17 +52,23 @@ func TestJS(t *testing.T) {
 	srv2 := httptest.NewUnstartedServer(nil)
 	srv2Addr := srv2.URL
 
-	srv.Config = &http.Server{Handler: wptHandler(srvAddr, srv1Addr, srv2Addr)}
-	srv1.Config = &http.Server{Handler: wptHandler(srvAddr, srv1Addr, srv2Addr)}
-	srv2.Config = &http.Server{Handler: wptHandler(srvAddr, srv1Addr, srv2Addr)}
+	srv3 := httptest.NewUnstartedServer(nil)
+	srv3Addr := srv3.URL
+
+	srv.Config = &http.Server{Handler: wptHandler(srvAddr, srv1Addr, srv2Addr, srv3Addr)}
+	srv1.Config = &http.Server{Handler: wptHandler(srvAddr, srv1Addr, srv2Addr, srv3Addr)}
+	srv2.Config = &http.Server{Handler: wptHandler(srvAddr, srv1Addr, srv2Addr, srv3Addr)}
+	srv2.Config = &http.Server{Handler: wptHandler(srvAddr, srv1Addr, srv2Addr, srv3Addr)}
 
 	srv.Start()
 	srv1.Start()
 	srv2.Start()
+	srv3.Start()
 
 	defer srv.Close()
 	defer srv1.Close()
 	defer srv2.Close()
+	defer srv3.Close()
 
 	_, err := http.Get(srv.URL + "/resources/testharness.js")
 	if err != nil {
