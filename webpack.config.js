@@ -41,7 +41,11 @@ module.exports = {
 			{
 				test: () => { return true },
 				sideEffects: true,
-			}
+			},
+			{
+				test: /\.(js)$/,
+				use: [ 'script-loader' ]
+      }
 		]
 	},
 	resolve: {

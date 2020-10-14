@@ -4024,6 +4024,11 @@ randombytes@^2.1.0:
   dependencies:
     safe-buffer "^5.1.0"
 
+raw-loader@~0.5.1:
+  version "0.5.1"
+  resolved "https://registry.yarnpkg.com/raw-loader/-/raw-loader-0.5.1.tgz#0c3d0beaed8a01c966d9787bf778281252a979aa"
+  integrity sha1-DD0L6u2KAclm2Xh793goElKpeao=
+
 read-chunk@^3.2.0:
   version "3.2.0"
   resolved "https://registry.yarnpkg.com/read-chunk/-/read-chunk-3.2.0.tgz#2984afe78ca9bfbbdb74b19387bf9e86289c16ca"
@@ -4341,6 +4346,13 @@ scoped-regex@^1.0.0:
   version "1.0.0"
   resolved "https://registry.yarnpkg.com/scoped-regex/-/scoped-regex-1.0.0.tgz#a346bb1acd4207ae70bd7c0c7ca9e566b6baddb8"
   integrity sha1-o0a7Gs1CB65wvXwMfKnlZra63bg=
+
+script-loader@^0.7.2:
+  version "0.7.2"
+  resolved "https://registry.yarnpkg.com/script-loader/-/script-loader-0.7.2.tgz#2016db6f86f25f5cf56da38915d83378bb166ba7"
+  integrity sha512-UMNLEvgOAQuzK8ji8qIscM3GIrRCWN6MmMXGD4SD5l6cSycgGsCo0tX5xRnfQcoghqct0tjHjcykgI1PyBE2aA==
+  dependencies:
+    raw-loader "~0.5.1"
 
 "semver@2 || 3 || 4 || 5", semver@^5.4.1, semver@^5.5.0, semver@^5.5.1, semver@^5.6.0:
   version "5.7.1"
