@@ -30,9 +30,9 @@ var packageJSONLock = sync.Mutex{}
 
 func main() {
 	publicAddr := "wpt." + os.Getenv("PUBLIC_ADDR")
-	publicAddrWWW := "a.wpt." + os.Getenv("PUBLIC_ADDR")
-	publicAddrWWW1 := "b.wpt." + os.Getenv("PUBLIC_ADDR")
-	publicAddrWWW2 := "c.wpt." + os.Getenv("PUBLIC_ADDR")
+	publicAddrWWW := "wpt-a." + os.Getenv("PUBLIC_ADDR")
+	publicAddrWWW1 := "wpt-b." + os.Getenv("PUBLIC_ADDR")
+	publicAddrWWW2 := "wpt-c." + os.Getenv("PUBLIC_ADDR")
 
 	if os.Getenv("DEV") != "" {
 		publicAddr = "bs-local.com:" + os.Getenv("PORT")
@@ -89,13 +89,21 @@ func wptHandler(publicAddr string, publicAddrWWW string, publicAddrWWW1 string, 
 		return nil
 	}
 
-	proxy.Transport = &rewritingTransport{
+	rewriter := &rewritingTransport{
 		roundTripper:   http.DefaultTransport,
 		publicAddr:     publicAddr,
 		publicAddrWWW:  publicAddrWWW,
 		publicAddrWWW1: publicAddrWWW1,
 		publicAddrWWW2: publicAddrWWW2,
 	}
+
+	if os.Getenv("PUBLIC_ADDR") != "" {
+		rewriter.domain = os.Getenv("PUBLIC_ADDR")
+	} else {
+		rewriter.domain = publicAddr
+	}
+
+	proxy.Transport = rewriter
 
 	return proxy
 }
@@ -106,6 +114,7 @@ type rewritingTransport struct {
 	publicAddrWWW  string
 	publicAddrWWW1 string
 	publicAddrWWW2 string
+	domain         string
 }
 
 func (t *rewritingTransport) RoundTrip(req *http.Request) (resp *http.Response, err error) {
@@ -221,8 +230,8 @@ func (t *rewritingTransport) rewriteString(s string) string {
 	s = strings.Replace(s, "www2.wpt.live:80", t.publicAddrWWW2, -1)
 	s = strings.Replace(s, "www2.wpt.live", t.publicAddrWWW2, -1)
 
-	s = strings.Replace(s, ".wpt.live:80", "."+t.publicAddr, -1)
-	s = strings.Replace(s, ".wpt.live", "."+t.publicAddr, -1)
+	s = strings.Replace(s, ".wpt.live:80", "."+t.domain, -1)
+	s = strings.Replace(s, ".wpt.live", "."+t.domain, -1)
 
 	s = strings.Replace(s, "wpt.live:80", t.publicAddr, -1)
 	s = strings.Replace(s, "wpt.live", t.publicAddr, -1)
