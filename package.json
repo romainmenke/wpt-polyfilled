@@ -1,15 +1,20 @@
 {
-  "name": "wpt-polyfilled",
-  "version": "1.0.0",
-  "main": "index.js",
-  "repository": "https://github.com/romainmenke/wpt-polyfilled.git",
-  "author": "romainmenke <romainmenke@gmail.com>",
-  "license": "MIT",
-  "dependencies": {
-    "@babel/cli": "^7.11.6",
-    "@babel/core": "^7.11.6",
-    "@babel/plugin-transform-block-scoping": "^7.11.1",
-    "@babel/preset-env": "^7.11.5",
-    "core-js": "^3.6.5"
-  }
+	"name": "wpt-polyfilled",
+	"version": "1.0.0",
+	"main": "index.js",
+	"repository": "https://github.com/romainmenke/wpt-polyfilled.git",
+	"author": "romainmenke <romainmenke@gmail.com>",
+	"license": "MIT",
+	"dependencies": {
+		"@babel/cli": "^7.11.6",
+		"@babel/core": "^7.11.6",
+		"@babel/plugin-transform-block-scoping": "^7.11.1",
+		"@babel/plugin-transform-runtime": "^7.11.5",
+		"@babel/preset-env": "^7.11.5",
+		"@babel/runtime": "^7.11.2",
+		"babel-loader": "^8.1.0",
+		"core-js": "^3.6.5",
+		"webpack": "^5.1.0",
+		"webpack-cli": "^4.0.0"
+	}
 }

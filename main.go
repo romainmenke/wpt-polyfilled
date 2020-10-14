@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -17,20 +18,27 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/evanw/esbuild/pkg/api"
+	"github.com/google/uuid"
 )
+
+var packageJSONLock = sync.Mutex{}
 
 func main() {
 	publicAddr := "wpt." + os.Getenv("PUBLIC_ADDR")
 	publicAddrWWW := "wpt-a." + os.Getenv("PUBLIC_ADDR")
 	publicAddrWWW1 := "wpt-b." + os.Getenv("PUBLIC_ADDR")
+	publicAddrWWW2 := "wpt-c." + os.Getenv("PUBLIC_ADDR")
+
 	if os.Getenv("DEV") != "" {
-		publicAddr = "bs-local.com:6543"
-		publicAddrWWW = "bs-local.com:6543"
-		publicAddrWWW1 = "bs1-local.com:6543"
+		publicAddr = "bs-local.com:" + os.Getenv("PORT")
+		publicAddrWWW = "bs-local.com:" + os.Getenv("PORT")
+		publicAddrWWW1 = "bs1-local.com:" + os.Getenv("PORT")
+		publicAddrWWW2 = "bs2-local.com:" + os.Getenv("PORT")
 	}
 
 	done := make(chan os.Signal, 1)
@@ -44,6 +52,7 @@ func main() {
 			publicAddr,
 			publicAddrWWW,
 			publicAddrWWW1,
+			publicAddrWWW2,
 		),
 	}
 
@@ -68,7 +77,7 @@ func main() {
 	}
 }
 
-func wptHandler(publicAddr string, publicAddrWWW string, publicAddrWWW1 string) http.Handler {
+func wptHandler(publicAddr string, publicAddrWWW string, publicAddrWWW1 string, publicAddrWWW2 string) http.Handler {
 	wptURL, err := url.Parse("https://wpt.live/")
 	if err != nil {
 		panic(err)
@@ -85,6 +94,7 @@ func wptHandler(publicAddr string, publicAddrWWW string, publicAddrWWW1 string) 
 		publicAddr:     publicAddr,
 		publicAddrWWW:  publicAddrWWW,
 		publicAddrWWW1: publicAddrWWW1,
+		publicAddrWWW2: publicAddrWWW2,
 	}
 
 	return proxy
@@ -95,6 +105,7 @@ type rewritingTransport struct {
 	publicAddr     string
 	publicAddrWWW  string
 	publicAddrWWW1 string
+	publicAddrWWW2 string
 }
 
 func (t *rewritingTransport) RoundTrip(req *http.Request) (resp *http.Response, err error) {
@@ -174,104 +185,150 @@ func (t *rewritingTransport) RoundTrip(req *http.Request) (resp *http.Response, 
 	return resp, nil
 }
 
-func (t *rewritingTransport) transpileJS(ctx context.Context, b []byte, fileName string) []byte {
-	inBuf := bytes.NewBuffer(b)
-	outBuf := bytes.NewBuffer(nil)
-	errBuf := bytes.NewBuffer(nil)
-
-	cmd := exec.Command(
-		"yarn",
-		"-s",
-		"babel",
-		"--config-file",
-		"./babel.rc.json",
-		"-f",
-		fileName,
-	)
-
-	cmd.Stdin = inBuf
-	cmd.Stdout = outBuf
-	cmd.Stderr = errBuf
-	err := cmd.Run()
-	if err != nil {
-		errB, errFromErrBuf := ioutil.ReadAll(errBuf)
-		if errFromErrBuf == nil {
-			log.Println(string(errB))
-			return b
-		}
-
-		log.Println(err)
-		return b
-	}
-
-	errB, err := ioutil.ReadAll(errBuf)
-	if err != nil {
-		log.Println(err)
-		return b
-	}
-
-	if len(errB) > 0 {
-		log.Println(string(errB))
-		return b
-	}
-
-	outB, err := ioutil.ReadAll(outBuf)
-	if err != nil {
-		log.Println(err)
-		return b
-	}
-
-	output := append(outB, []byte("\n/* transpiled */\n")...)
-	err = validateSource(output)
-	if err != nil {
-		log.Println(err)
-		return b
-	}
-
-	return output
-}
-
 func (t *rewritingTransport) rewriteBytes(b []byte) []byte {
+	b = bytes.Replace(b, []byte("www.wpt.live:80"), []byte(t.publicAddrWWW), -1)
 	b = bytes.Replace(b, []byte("www.wpt.live"), []byte(t.publicAddrWWW), -1)
+
+	b = bytes.Replace(b, []byte("www1.wpt.live:80"), []byte(t.publicAddrWWW1), -1)
 	b = bytes.Replace(b, []byte("www1.wpt.live"), []byte(t.publicAddrWWW1), -1)
+
+	b = bytes.Replace(b, []byte("www2.wpt.live:80"), []byte(t.publicAddrWWW2), -1)
+	b = bytes.Replace(b, []byte("www2.wpt.live"), []byte(t.publicAddrWWW2), -1)
+
+	b = bytes.Replace(b, []byte("wpt.live:80"), []byte(t.publicAddr), -1)
 	b = bytes.Replace(b, []byte("wpt.live"), []byte(t.publicAddr), -1)
+
+	if os.Getenv("DEV") != "" {
+		b = bytes.Replace(b, []byte("https://"), []byte("http://"), 1)
+	}
 
 	return b
 }
 
 func (t *rewritingTransport) rewriteString(s string) string {
+	s = strings.Replace(s, "www.wpt.live:80", t.publicAddrWWW, -1)
 	s = strings.Replace(s, "www.wpt.live", t.publicAddrWWW, -1)
+
+	s = strings.Replace(s, "www1.wpt.live:80", t.publicAddrWWW1, -1)
 	s = strings.Replace(s, "www1.wpt.live", t.publicAddrWWW1, -1)
+
+	s = strings.Replace(s, "www2.wpt.live:80", t.publicAddrWWW2, -1)
+	s = strings.Replace(s, "www2.wpt.live", t.publicAddrWWW2, -1)
+
+	s = strings.Replace(s, "wpt.live:80", t.publicAddr, -1)
 	s = strings.Replace(s, "wpt.live", t.publicAddr, -1)
+
+	if os.Getenv("DEV") != "" {
+		s = strings.Replace(s, "https://", "http://", 1)
+	}
 
 	return s
 }
 
 func (t *rewritingTransport) rewriteBytesReverse(b []byte) []byte {
 	b = bytes.Replace(b, []byte("www."+t.publicAddrWWW), []byte("www.wpt.live"), -1)
-	b = bytes.Replace(b, []byte("www1."+t.publicAddrWWW), []byte("www.wpt.live"), -1)
+
+	b = bytes.Replace(b, []byte("www1."+t.publicAddrWWW), []byte("www1.wpt.live"), -1)
 	b = bytes.Replace(b, []byte("www1."+t.publicAddrWWW1), []byte("www1.wpt.live"), -1)
+
+	b = bytes.Replace(b, []byte("www2."+t.publicAddrWWW), []byte("www2.wpt.live"), -1)
+	b = bytes.Replace(b, []byte("www2."+t.publicAddrWWW2), []byte("www2.wpt.live"), -1)
 
 	b = bytes.Replace(b, []byte(t.publicAddr), []byte("wpt.live"), -1)
 	b = bytes.Replace(b, []byte(t.publicAddrWWW), []byte("www.wpt.live"), -1)
 	b = bytes.Replace(b, []byte(t.publicAddrWWW1), []byte("www1.wpt.live"), -1)
+	b = bytes.Replace(b, []byte(t.publicAddrWWW2), []byte("www2.wpt.live"), -1)
 
 	return b
 }
 
 func (t *rewritingTransport) rewriteStringReverse(s string) string {
 	s = strings.Replace(s, "www."+t.publicAddrWWW, "www.wpt.live", -1)
-	s = strings.Replace(s, "www1."+t.publicAddrWWW, "www.wpt.live", -1)
+
+	s = strings.Replace(s, "www1."+t.publicAddrWWW, "www1.wpt.live", -1)
 	s = strings.Replace(s, "www1."+t.publicAddrWWW1, "www1.wpt.live", -1)
+
+	s = strings.Replace(s, "www2."+t.publicAddrWWW, "www2.wpt.live", -1)
+	s = strings.Replace(s, "www2."+t.publicAddrWWW2, "www2.wpt.live", -1)
 
 	s = strings.Replace(s, t.publicAddr, "wpt.live", -1)
 	s = strings.Replace(s, t.publicAddrWWW, "www.wpt.live", -1)
 	s = strings.Replace(s, t.publicAddrWWW1, "www1.wpt.live", -1)
+	s = strings.Replace(s, t.publicAddrWWW2, "www2.wpt.live", -1)
 
 	return s
 }
 
-func validateSource(code []byte) error {
+func (t *rewritingTransport) transpileJS(ctx context.Context, b []byte, fileName string) []byte {
+	id := uuid.New()
+
+	jsInFileName := fmt.Sprintf("artifacts/%s.js", id)
+	jsOutFileName := fmt.Sprintf("dist/%s.js", id)
+
+	// Source
+	{
+		f, err := os.Create(jsInFileName)
+		if err != nil {
+			log.Println(err)
+			return b
+		}
+
+		defer f.Close()
+
+		n, err := f.Write(b)
+		if err != nil {
+			log.Println(err)
+			return b
+		}
+
+		if n != len(b) {
+			log.Println(io.ErrShortWrite)
+			return b
+		}
+
+		err = f.Close()
+		if err != nil {
+			log.Println(err)
+			return b
+		}
+	}
+
+	// Webpack
+	{
+		cmd := exec.Command(
+			"yarn",
+			"-s",
+			"webpack",
+			"--entry",
+			"./"+jsInFileName,
+			"-o",
+			"./"+jsOutFileName,
+		)
+
+		cmdOutput, err := cmd.CombinedOutput()
+		if err != nil {
+			log.Println(err)
+			if len(cmdOutput) > 0 {
+				log.Println(string(cmdOutput))
+			}
+			return b
+		}
+
+		if len(cmdOutput) > 0 {
+			log.Println(string(cmdOutput))
+		}
+
+		result, err := ioutil.ReadFile(filepath.Join(jsOutFileName, "main.js"))
+		if err != nil {
+			log.Println(err)
+			return b
+		}
+
+		return append(result, []byte("\n/* transpiled */\n")...)
+	}
+}
+
+func validateJSSource(code []byte) error {
 	result := api.Transform(string(code), api.TransformOptions{
 		Loader: api.LoaderJS,
 		Target: api.ES5,
@@ -285,7 +342,7 @@ func validateSource(code []byte) error {
 		}
 
 		for _, warning := range result.Warnings {
-			if warning.Text == "Comparison with -0 using the \"===\" operator will also match 0" {
+			if strings.Contains(warning.Text, "Comparison with -0") {
 				continue
 			}
 
