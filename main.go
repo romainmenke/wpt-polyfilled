@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -23,7 +22,6 @@ import (
 	"time"
 
 	"github.com/evanw/esbuild/pkg/api"
-	"github.com/google/uuid"
 )
 
 var packageJSONLock = sync.Mutex{}
@@ -278,72 +276,65 @@ func (t *rewritingTransport) rewriteStringReverse(s string) string {
 }
 
 func (t *rewritingTransport) transpileJS(ctx context.Context, b []byte, fileName string) []byte {
-	id := uuid.New()
+	return t.transpileJSWithBabel(ctx, b, fileName)
+}
 
-	jsInFileName := fmt.Sprintf("artifacts/%s.js", id)
-	jsOutFileName := fmt.Sprintf("dist/%s.js", id)
+func (t *rewritingTransport) transpileJSWithBabel(ctx context.Context, b []byte, fileName string) []byte {
+	inBuf := bytes.NewBuffer(b)
+	outBuf := bytes.NewBuffer(nil)
+	errBuf := bytes.NewBuffer(nil)
 
-	// Source
-	{
-		f, err := os.Create(jsInFileName)
-		if err != nil {
-			log.Println(err)
+	cmd := exec.CommandContext(
+		ctx,
+		"yarn",
+		"-s",
+		"babel",
+		"--config-file",
+		"./babel.rc.json",
+		"-f",
+		fileName,
+	)
+
+	cmd.Stdin = inBuf
+	cmd.Stdout = outBuf
+	cmd.Stderr = errBuf
+	err := cmd.Run()
+	if err != nil {
+		errB, errFromErrBuf := ioutil.ReadAll(errBuf)
+		if errFromErrBuf == nil {
+			log.Println(string(errB))
 			return b
 		}
 
-		defer f.Close()
-
-		n, err := f.Write(b)
-		if err != nil {
-			log.Println(err)
-			return b
-		}
-
-		if n != len(b) {
-			log.Println(io.ErrShortWrite)
-			return b
-		}
-
-		err = f.Close()
-		if err != nil {
-			log.Println(err)
-			return b
-		}
+		log.Println(err)
+		return b
 	}
 
-	// Webpack
-	{
-		cmd := exec.Command(
-			"yarn",
-			"-s",
-			"webpack",
-			"--entry",
-			"./"+jsInFileName,
-			"-o",
-			"./"+jsOutFileName,
-		)
-
-		cmdOutput, err := cmd.CombinedOutput()
-		if err != nil {
-			log.Println(err)
-			if len(cmdOutput) > 0 {
-				log.Println(string(cmdOutput))
-			}
-			return b
-		}
-
-		if len(cmdOutput) > 0 {
-			log.Println(string(cmdOutput))
-		}
-
-		result, err := ioutil.ReadFile(filepath.Join(jsOutFileName, "main.js"))
-		if err != nil {
-			log.Println(err)
-			return b
-		}
-
-		return append(result, []byte("\n/* transpiled */\n")...)
+	errB, err := ioutil.ReadAll(errBuf)
+	if err != nil {
+		log.Println(err)
+		return b
 	}
+
+	if len(errB) > 0 {
+		log.Println(string(errB))
+		return b
+	}
+
+	outB, err := ioutil.ReadAll(outBuf)
+	if err != nil {
+		log.Println(err)
+		return b
+	}
+
+	output := append(outB, []byte("\n/* transpiled */\n")...)
+	err = validateJSSource(output)
+	if err != nil {
+		log.Println(err)
+		return b
+	}
+
+	return output
 }
 
 func validateJSSource(code []byte) error {

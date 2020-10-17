@@ -1,0 +1,20 @@
+{
+  "presets": [
+    [
+      "@babel/preset-env",
+      {
+        "modules": false,
+        "useBuiltIns": false,
+        "targets": {
+          "browsers": "> 0.5%, last 5 versions",
+          "chrome": "41",
+          "firefox": "41",
+          "safari": "9",
+          "ios": "7",
+          "android": "4.1",
+          "ie": "8"
+        }
+      }
+    ]
+  ]
+}
